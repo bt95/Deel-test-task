@@ -39,4 +39,35 @@ app.get("/contracts", getProfile, async (req, res) => {
   res.json(contractList);
 });
 
+app.get("/jobs/unpaid", getProfile, async (req, res) => {
+  const { Contract, Job } = req.app.get("models");
+
+  const queryFieldName =
+    req.profile.type === "client" ? "ClientId" : "ContractorId";
+
+  // currently SQLite doesn't currently support right joins
+  // so the contractList has to be fetched and then
+  // map the jobList out from each contract
+  const contractWithUnpaidJobList = await Contract.findAll({
+    where: {
+      [queryFieldName]: req.profile.id,
+      status: "in_progress",
+    },
+    include: [
+      {
+        model: Job,
+        where: {
+          paid: false,
+        },
+      },
+    ],
+  });
+
+  const unpaidJobList = contractWithUnpaidJobList.map(
+    (contract) => contract.Jobs
+  );
+  // as the .map above will return an array of arrays they have to be flattened
+  res.json(unpaidJobList.flat());
+});
+
 module.exports = app;
