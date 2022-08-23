@@ -148,4 +148,61 @@ app.post("/jobs/:job_id/pay", getProfile, async (req, res) => {
   }
 });
 
+app.post("/balances/deposit/:userId", getProfile, async (req, res) => {
+  const { Profile, Contract, Job } = req.app.get("models");
+
+  if (req.profile.id.toString() !== req.params.userId)
+    return res
+      .status(403)
+      .send("A client cannot deposit money for another user");
+
+  if (req.profile.type !== "client")
+    return res.status(403).send("Only a client is allowed to deposit money");
+
+  const contractWithJobListToBePaid = await Contract.findAll({
+    where: {
+      ClientId: req.profile.id,
+      status: "in_progress",
+    },
+    include: [
+      {
+        model: Job,
+        where: {
+          paid: false,
+        },
+      },
+    ],
+  });
+
+  if (!contractWithJobListToBePaid?.length)
+    return res
+      .status(400)
+      .send("There are no ongoing contracts so no deposit can be made");
+
+  const totalAmountToBePaid = contractWithJobListToBePaid
+    .map((contract) => contract.Jobs)
+    .flat()
+    .reduce((acc, job) => {
+      return (acc += job.price);
+    }, 0);
+
+  console.log("Total amount to be paid:", totalAmountToBePaid);
+
+  if (req.body.amount > totalAmountToBePaid / 4)
+    return res
+      .status(400)
+      .send("A client can't deposit more than 25% of his total of jobs to pay");
+
+  const updatedProfile = await Profile.increment(["balance"], {
+    by: req.body.amount,
+    where: {
+      id: req.params.userId,
+    },
+  });
+
+  console.log({ updatedProfile });
+
+  res.send(`$${req.body.amount} were successfully deposited.`);
+});
+
 module.exports = app;
