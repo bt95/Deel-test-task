@@ -105,7 +105,7 @@ app.post("/jobs/:job_id/pay", getProfile, async (req, res) => {
   const t = await sequelize.transaction();
 
   try {
-    await Profile.increment(["balance"], {
+    const updateClientPromise = Profile.increment(["balance"], {
       by: -contractWithJobToBePaid.Jobs[0].price,
       where: {
         id: contractWithJobToBePaid.ClientId,
@@ -113,7 +113,7 @@ app.post("/jobs/:job_id/pay", getProfile, async (req, res) => {
       transaction: t,
     });
 
-    await Profile.increment(["balance"], {
+    const updateContractorPromise = Profile.increment(["balance"], {
       by: contractWithJobToBePaid.Jobs[0].price,
       where: {
         id: contractWithJobToBePaid.ContractorId,
@@ -121,7 +121,7 @@ app.post("/jobs/:job_id/pay", getProfile, async (req, res) => {
       transaction: t,
     });
 
-    await Contract.update(
+    const updateContractPromise = Contract.update(
       { status: "terminated" },
       {
         where: {
@@ -131,10 +131,17 @@ app.post("/jobs/:job_id/pay", getProfile, async (req, res) => {
       }
     );
 
-    await Job.update(
+    const updateJobPromise = Job.update(
       { paid: true, paymentDate: new Date() },
       { where: { id: req.params.job_id }, transaction: t }
     );
+
+    await Promise.all([
+      updateClientPromise,
+      updateContractorPromise,
+      updateContractPromise,
+      updateJobPromise,
+    ]);
 
     await t.commit();
 
