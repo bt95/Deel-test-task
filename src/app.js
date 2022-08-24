@@ -209,14 +209,12 @@ app.post("/balances/deposit/:userId", getProfile, async (req, res) => {
         "A client can't deposit more than 25% of his total of jobs to pay",
     });
 
-  const updatedProfile = await Profile.increment(["balance"], {
+  await Profile.increment(["balance"], {
     by: req.body.amount,
     where: {
       id: req.params.userId,
     },
   });
-
-  console.log({ updatedProfile });
 
   res.json({ message: `$${req.body.amount} were successfully deposited.` });
 });
@@ -282,14 +280,15 @@ app.get("/admin/best-clients", async (req, res) => {
       .status(400)
       .json({ message: "The provided `endDate` is invalid" });
 
-  if (isNaN(paresInt(limit)))
+  if (limit && (isNaN(parseInt(limit)) || limit < 1))
     return res.status(400).json({ message: "The provided `limit` is invalid" });
 
-  const [bestPaidProfession] = await Job.findAll({
+  const bestPayingClientList = await Job.findAll({
     raw: true,
     attributes: [
-      "Contract.Contractor.profession",
-      [sequelize.fn("SUM", sequelize.col("price")), "totalEarned"],
+      "Contract.Client.id",
+      [sequelize.literal("firstName || ' ' || lastName"), "fullName"],
+      [sequelize.fn("SUM", sequelize.col("price")), "paid"],
     ],
     where: {
       paymentDate: { [between]: [new Date(startDate), new Date(endDate)] },
@@ -299,18 +298,20 @@ app.get("/admin/best-clients", async (req, res) => {
         model: Contract,
         where: { status: "terminated" },
         attributes: [],
-        include: { model: Profile, as: "Contractor", attributes: [] },
+        include: { model: Profile, as: "Client", attributes: [] },
       },
     ],
-    group: ["Contract.ContractorId"],
-    order: [["totalEarned", "DESC"]],
+    group: ["Contract.ClientId"],
+    order: [["paid", "DESC"]],
     limit: limit || 2,
   });
 
   res.json(
-    bestPaidProfession || {
-      message: "There is no paid job in the selected interval",
-    }
+    bestPayingClientList?.length
+      ? bestPayingClientList
+      : {
+          message: "There is no paid job in the selected interval",
+        }
   );
 });
 
