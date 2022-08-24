@@ -78,7 +78,7 @@ app.post("/jobs/:job_id/pay", getProfile, async (req, res) => {
   if (req.profile.type !== "client")
     return res
       .status(403)
-      .send("Only a client is allowed to initiate a payment");
+      .json({ message: "Only a client is allowed to initiate a payment" });
 
   const contractWithJobToBePaid = await Contract.findOne({
     where: {
@@ -97,12 +97,14 @@ app.post("/jobs/:job_id/pay", getProfile, async (req, res) => {
   });
 
   if (!contractWithJobToBePaid)
-    return res.status(404).send("The job was not found or was already paid");
+    return res
+      .status(404)
+      .json({ message: "The job was not found or was already paid" });
 
   if (req.profile.balance < contractWithJobToBePaid.Jobs[0].price)
-    return res
-      .status(400)
-      .send("There are no sufficient funds to process the payment");
+    return res.status(400).json({
+      message: "There are no sufficient funds to process the payment",
+    });
 
   const t = await sequelize.transaction();
 
@@ -147,13 +149,15 @@ app.post("/jobs/:job_id/pay", getProfile, async (req, res) => {
 
     await t.commit();
 
-    res.send("The job was successfully paid");
+    res.json({ message: "The job was successfully paid" });
   } catch (error) {
     console.log({ error });
 
     await t.rollback();
 
-    res.status(500).send("An error has occured. Please try again!");
+    res
+      .status(500)
+      .json({ message: "An error has occured. Please try again!" });
   }
 });
 
@@ -163,10 +167,12 @@ app.post("/balances/deposit/:userId", getProfile, async (req, res) => {
   if (req.profile.id.toString() !== req.params.userId)
     return res
       .status(403)
-      .send("A client cannot deposit money for another user");
+      .json({ message: "A client cannot deposit money for another user" });
 
   if (req.profile.type !== "client")
-    return res.status(403).send("Only a client is allowed to deposit money");
+    return res
+      .status(403)
+      .json({ message: "Only a client is allowed to deposit money" });
 
   const contractWithJobListToBePaid = await Contract.findAll({
     where: {
@@ -184,9 +190,9 @@ app.post("/balances/deposit/:userId", getProfile, async (req, res) => {
   });
 
   if (!contractWithJobListToBePaid?.length)
-    return res
-      .status(400)
-      .send("There are no ongoing contracts so no deposit can be made");
+    return res.status(400).json({
+      message: "There are no ongoing contracts so no deposit can be made",
+    });
 
   const totalAmountToBePaid = contractWithJobListToBePaid
     .map((contract) => contract.Jobs)
@@ -198,9 +204,10 @@ app.post("/balances/deposit/:userId", getProfile, async (req, res) => {
   console.log("Total amount to be paid:", totalAmountToBePaid);
 
   if (req.body.amount > totalAmountToBePaid / 4)
-    return res
-      .status(400)
-      .send("A client can't deposit more than 25% of his total of jobs to pay");
+    return res.status(400).json({
+      message:
+        "A client can't deposit more than 25% of his total of jobs to pay",
+    });
 
   const updatedProfile = await Profile.increment(["balance"], {
     by: req.body.amount,
@@ -211,7 +218,7 @@ app.post("/balances/deposit/:userId", getProfile, async (req, res) => {
 
   console.log({ updatedProfile });
 
-  res.send(`$${req.body.amount} were successfully deposited.`);
+  res.json({ message: `$${req.body.amount} were successfully deposited.` });
 });
 
 app.get("/admin/best-profession", async (req, res) => {
@@ -220,11 +227,15 @@ app.get("/admin/best-profession", async (req, res) => {
   const { start: startDate, end: endDate } = req.query;
 
   if (!isValidDate(startDate)) {
-    res.status(400).send("The `startDate` is invalid");
+    return res
+      .status(400)
+      .json({ message: "The provided `startDate` is invalid" });
   }
 
   if (!isValidDate(endDate)) {
-    res.status(400).send("The `endDate` is invalid");
+    return res
+      .status(400)
+      .json({ message: "The provided `endDate` is invalid" });
   }
 
   const [bestPaidProfession] = await Job.findAll({
@@ -247,6 +258,53 @@ app.get("/admin/best-profession", async (req, res) => {
     group: ["Contract.ContractorId"],
     order: [["totalEarned", "DESC"]],
     limit: 1,
+  });
+
+  return res.json(
+    bestPaidProfession || {
+      message: "There is no paid job in the selected interval",
+    }
+  );
+});
+
+app.get("/admin/best-clients", async (req, res) => {
+  const { Profile, Contract, Job } = req.app.get("models");
+
+  const { start: startDate, end: endDate, limit } = req.query;
+
+  if (!isValidDate(startDate))
+    return res
+      .status(400)
+      .json({ message: "The provided `startDate` is invalid" });
+
+  if (!isValidDate(endDate))
+    return res
+      .status(400)
+      .json({ message: "The provided `endDate` is invalid" });
+
+  if (isNaN(paresInt(limit)))
+    return res.status(400).json({ message: "The provided `limit` is invalid" });
+
+  const [bestPaidProfession] = await Job.findAll({
+    raw: true,
+    attributes: [
+      "Contract.Contractor.profession",
+      [sequelize.fn("SUM", sequelize.col("price")), "totalEarned"],
+    ],
+    where: {
+      paymentDate: { [between]: [new Date(startDate), new Date(endDate)] },
+    },
+    include: [
+      {
+        model: Contract,
+        where: { status: "terminated" },
+        attributes: [],
+        include: { model: Profile, as: "Contractor", attributes: [] },
+      },
+    ],
+    group: ["Contract.ContractorId"],
+    order: [["totalEarned", "DESC"]],
+    limit: limit || 2,
   });
 
   res.json(
