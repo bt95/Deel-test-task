@@ -4,6 +4,18 @@
 
 This backend exercise involves building a Node.js/Express.js app that will serve a REST API. We imagine you should spend around 3 hours at implement this feature.
 
+## Future possible improvements
+
+- One of the first improvements would be to separate the endpoints into their specific files (contracts, profile, jobs, admin) and to structure them in `routers`, `controllers`, `services`, `repository` to have a **cleaner code** and a **better separation of concerns**.
+
+- Then, a possible step would be to add unit tests and even integration tests to ensure the code is **reliable** and **meets and keeps the quality standards before it's deployed**.
+
+- Setting up ESLint, Prettier and maybe converting the project to TypeScript would add some more value to it by making it **easier to develop further**, **consistent** and **more solid**.
+
+- Moving to a **production- and high-traffic-ready DB** is also required before launching the API.
+
+### Thanks for offering the opportunity to participate in this coding task
+
 ## Data Models
 
 > **All models are defined in src/model.js**
@@ -11,13 +23,17 @@ This backend exercise involves building a Node.js/Express.js app that will serve
 ### Profile
 
 A profile can be either a `client` or a `contractor`.
+
 clients create contracts with contractors. contractor does jobs for clients and get paid.
+
 Each profile has a balance property.
 
 ### Contract
 
 A contract between and client and a contractor.
+
 Contracts have 3 statuses, `new`, `in_progress`, `terminated`. contracts are considered active only when in status `in_progress`
+
 Contracts group jobs within them.
 
 ### Job
@@ -45,44 +61,63 @@ The exercise requires [Node.js](https://nodejs.org/en/) to be installed. We reco
 - The database provider is SQLite, which will store data in a file local to your repository called `database.sqlite3`. The ORM [Sequelize](http://docs.sequelizejs.com/) is on top of it. You should only have to interact with Sequelize - **please spend some time reading sequelize documentation before starting the exercise.**
 
 - To authenticate users use the `getProfile` middleware that is located under src/middleware/getProfile.js. users are authenticated by passing `profile_id` in the request header. after a user is authenticated his profile will be available under `req.profile`. make sure only users that are on the contract can access their contracts.
+
 - The server is running on port 3001.
 
 ## APIs To Implement
 
 Below is a list of the required API's for the application.
 
-1. **_GET_** `/contracts/:id` - This API is broken 😵! it should return the contract only if it belongs to the profile calling. better fix that!
+1.  **_GET_** `/contracts/:id` - This API is broken 😵! it should return the contract only if it belongs to the profile calling. better fix that!
 
-1. **_GET_** `/contracts` - Returns a list of contracts belonging to a user (client or contractor), the list should only contain non terminated contracts.
+1.  **_GET_** `/contracts` - Returns a list of contracts belonging to a user (client or contractor), the list should only contain non terminated contracts.
 
-1. **_GET_** `/jobs/unpaid` - Get all unpaid jobs for a user (**_either_** a client or contractor), for **_active contracts only_**.
+1.  **_GET_** `/jobs/unpaid` - Get all unpaid jobs for a user (**_either_** a client or contractor), for **_active contracts only_**.
 
-1. **_POST_** `/jobs/:job_id/pay` - Pay for a job, a client can only pay if his balance >= the amount to pay. The amount should be moved from the client's balance to the contractor balance.
+1.  **_POST_** `/jobs/:job_id/pay` - Pay for a job, a client can only pay if his balance >= the amount to pay. The amount should be moved from the client's balance to the contractor balance.
 
-1. **_POST_** `/balances/deposit/:userId` - Deposits money into the the the balance of a client, a client can't deposit more than 25% his total of jobs to pay. (at the deposit moment)
+1.  **_POST_** `/balances/deposit/:userId` - Deposits money into the the the balance of a client, a client can't deposit more than 25% his total of jobs to pay. (at the deposit moment)
 
-1. **_GET_** `/admin/best-profession?start=<date>&end=<date>` - Returns the profession that earned the most money (sum of jobs paid) for any contractor that worked in the query time range.
+1.  **_GET_** `/admin/best-profession?start=<date>&end=<date>` - Returns the profession that earned the most money (sum of jobs paid) for any contractor that worked in the query time range.
 
-1. **_GET_** `/admin/best-clients?start=<date>&end=<date>&limit=<integer>` - Returns the clients that paid the most for jobs in the query time period. limit query parameter should be applied, default limit is 2.
+1.  **_GET_** `/admin/best-clients?start=<date>&end=<date>&limit=<integer>` - Returns the clients that paid the most for jobs in the query time period. limit query parameter should be applied, default limit is 2.
 
 ```
- [
-    {
-        "id": 1,
-        "fullName": "Reece Moyer",
-        "paid" : 100.3
-    },
-    {
-        "id": 200,
-        "fullName": "Debora Martin",
-        "paid" : 99
-    },
-    {
-        "id": 22,
-        "fullName": "Debora Martin",
-        "paid" : 21
-    }
+
+[
+
+{
+
+"id": 1,
+
+"fullName": "Reece Moyer",
+
+"paid" : 100.3
+
+},
+
+{
+
+"id": 200,
+
+"fullName": "Debora Martin",
+
+"paid" : 99
+
+},
+
+{
+
+"id": 22,
+
+"fullName": "Debora Martin",
+
+"paid" : 21
+
+}
+
 ]
+
 ```
 
 ## Going Above and Beyond the Requirements
