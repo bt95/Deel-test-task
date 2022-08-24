@@ -1,8 +1,10 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const {
-  Op: { ne },
+  Op: { ne, between },
 } = require("sequelize");
+
+const isValidDate = (date) => (isNaN(Date.parse(date)) ? false : true);
 
 const { sequelize } = require("./model");
 
@@ -210,6 +212,48 @@ app.post("/balances/deposit/:userId", getProfile, async (req, res) => {
   console.log({ updatedProfile });
 
   res.send(`$${req.body.amount} were successfully deposited.`);
+});
+
+app.get("/admin/best-profession", async (req, res) => {
+  const { Profile, Contract, Job } = req.app.get("models");
+
+  const { start: startDate, end: endDate } = req.query;
+
+  if (!isValidDate(startDate)) {
+    res.status(400).send("The `startDate` is invalid");
+  }
+
+  if (!isValidDate(endDate)) {
+    res.status(400).send("The `endDate` is invalid");
+  }
+
+  const [bestPaidProfession] = await Job.findAll({
+    raw: true,
+    attributes: [
+      "Contract.Contractor.profession",
+      [sequelize.fn("SUM", sequelize.col("price")), "totalEarned"],
+    ],
+    where: {
+      paymentDate: { [between]: [new Date(startDate), new Date(endDate)] },
+    },
+    include: [
+      {
+        model: Contract,
+        where: { status: "terminated" },
+        attributes: [],
+        include: { model: Profile, as: "Contractor", attributes: [] },
+      },
+    ],
+    group: ["Contract.ContractorId"],
+    order: [["totalEarned", "DESC"]],
+    limit: 1,
+  });
+
+  res.json(
+    bestPaidProfession || {
+      message: "There is no paid job in the selected interval",
+    }
+  );
 });
 
 module.exports = app;
